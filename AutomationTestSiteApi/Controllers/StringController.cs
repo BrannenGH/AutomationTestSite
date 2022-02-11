@@ -5,12 +5,15 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
-using System.Web.Http;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using AutomationTestSite;
 
 namespace AutomationTestSite.Controllers
 {
-    public class StringController : ApiController
+    public class StringController : ControllerBase
     {
         Product[] products = new Product[] 
         { 
@@ -19,10 +22,10 @@ namespace AutomationTestSite.Controllers
             new Product { Id = 3, Name = "Hammer", Category = "Hardware", Price = 16.99M } 
         };
 
-        [System.Web.Http.Route("api/String/Get")]
-        public IHttpActionResult Get()
+        [HttpGet("api/String/Get")]
+        public IActionResult Get()
         {
-            IHttpActionResult response = null;
+            IActionResult response = null;
             string toBeUsed = string.Empty;
             foreach (var p in products)
             {
@@ -32,165 +35,135 @@ namespace AutomationTestSite.Controllers
             var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
             httpResponse.Content = new StringContent(toBeUsed);
             httpResponse.Content.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
-            response = ResponseMessage(httpResponse);
+            response = Ok(httpResponse);
             return response;
         }
-        [System.Web.Http.Route("api/String/{id:int}")]
-        public IHttpActionResult GetProduct(int id)
+
+        [HttpGet("api/String/{id:int}")]
+        public IActionResult GetProduct(int id)
         {
-            IHttpActionResult response = null;
-
-
             var product = products.FirstOrDefault((p) => p.Id == id);
             if (product == null)
             {
-                response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.NoContent));
-                return response;
+                return NoContent();
             }
 
             if (id > 1)
             {
-                response = Conflict();
-                return response;
+                return Conflict();
             }
 
-            var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
-            httpResponse.Content = new StringContent(buildString(product));
-            httpResponse.Content.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
-            response = ResponseMessage(httpResponse);
-
-            return response;
+            return new ContentResult{
+                Content = buildString(product),
+                ContentType = "text/plain",
+                StatusCode = StatusCodes.Status200OK
+            };
         }
-        [System.Web.Http.Route("api/String/{name}")]
-        public IHttpActionResult GetProduct(string name)
+
+        [HttpGet("api/String/{name}")]
+        public IActionResult GetProduct(string name)
         {
-            IHttpActionResult response = null;
-
-
             var product = products.FirstOrDefault((p) => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (product == null)
             {
-                response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.NoContent));
-                return response;
+                return NoContent();
             }
 
-
-            var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
-            httpResponse.Content = new StringContent(buildString(product));
-            httpResponse.Content.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
-            response = ResponseMessage(httpResponse);
-
-            return response;
+            return new ContentResult{
+                Content = buildString(product),
+                ContentType = "text/plain",
+                StatusCode = StatusCodes.Status200OK
+            };
         }
 
-        public IHttpActionResult Delete(int id)
+        public IActionResult Delete(int id)
         {
-            IHttpActionResult response = null;
-
             if (id > 3 || id < 0)
             {
-                response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.NotFound,"Resource was not found"));
-                return response;
+                return NotFound();
             }
-
-
-
-            var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
-
-            response = ResponseMessage(httpResponse);
-
-            return response;
+            
+            return Ok();
         }
 
 
-        public IHttpActionResult Put(int id, [FromBody]string value)
+        public IActionResult Put(int id, [FromBody] string value)
         {
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.InternalServerError, "value is required"));
-
             if (value != null)
             {
                 if (id > 20)
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.InternalServerError,
-                                 "An error occurred attempting to update Servers"));
+                    return this.CreateErrorResponse(StatusCodes.Status500InternalServerError, "An error occurred attempting to update Servers");
                 }
                 else
                 {
-                    response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.OK));
+                    return Ok();
                 }
             }
             else
             {
-                response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.Conflict,
-                     string.Format("No Product found for name = {0} ", id)));
+                return this.CreateErrorResponse(StatusCodes.Status409Conflict, string.Format("No Product found for name = {0} ", id));
             }
-
-            return response;
         }
 
-        [System.Web.Http.HttpPost]
-        [System.Web.Http.Route("api/String/")]
-        public IHttpActionResult Post([FromBody]string value)
+        [HttpPost("api/String/")]
+        public IActionResult Post([FromBody]string value)
         {
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.InternalServerError, "value is required"));
-
             if (value != null)
             {
                 if (value.Equals(string.Empty))
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.BadRequest, "No data"));
+                    return this.CreateErrorResponse(StatusCodes.Status400BadRequest, "No data");
                 }
                 else if (value.Contains("Product ID: 1"))
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.Conflict, "Duplicate value"));
+                    return this.CreateErrorResponse(StatusCodes.Status409Conflict, "Duplicate value");
                 }
                 else
                 {
-                    response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.OK));
+                    return Ok(); 
                 }
             }
 
-            return response;
+            return this.CreateErrorResponse(StatusCodes.Status500InternalServerError, "value is required");
         }
 
-        [System.Web.Http.HttpPatch]
-        public IHttpActionResult Patch(int id, [FromBody]string value)
+        [HttpPatch]
+        public IActionResult Patch(int id, [FromBody]string value)
         {
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.BadRequest, "Value is required"));
-
             if (value != null)
             {
                 if (id > 20)
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.NotFound, "No Product found for value"));
+                    this.CreateErrorResponse(StatusCodes.Status404NotFound, "No Product found for value");
                 }
                 else
                 {
+                    // Below TODO from original ASP.NET MVC application.
                     //// TODO: Figure out why returnValue will fail between streamcontent and stringcontent
                     string returnValue = $"Patched {value}";
                     string returnValue2 = $"Patched";
-                    response = Ok(returnValue2);
+                    return Ok(returnValue2);
                 }
             }
 
-            return response;
+            return this.CreateErrorResponse(StatusCodes.Status400BadRequest, "Value is required");
         }
 
-        [System.Web.Http.Route("api/ZED")]
-        [System.Web.Http.AcceptVerbs("ZED")]
-        public IHttpActionResult Zed([FromBody]string value)
+        [Route("api/ZED")]
+        [AcceptVerbs("ZED")]
+        public IActionResult Zed([FromBody]string value)
         {
             var httpResponse = new HttpResponseMessage(HttpStatusCode.UseProxy);
 
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.UseProxy, "ZED!"));
 
             if (value != null)
             {
-                response = Ok(value);
+                // The quotation marks are added so it works like it did in the MVC application.
+                return Ok($"\"{value}\"");
             }
 
-            return response;
-
+            return this.CreateErrorResponse(StatusCodes.Status305UseProxy, "ZED!");
         }
 
         private string buildString(Product product)

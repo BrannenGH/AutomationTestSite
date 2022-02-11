@@ -5,25 +5,32 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web;
-using System.Web.Http;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using AutomationTestSite;
 
 namespace AutomationTestSite.Controllers
 {
-    public class XML_JSONController : ApiController
+    [ApiController]
+    [Route("[controller]")]
+    public class XML_JSONController : ControllerBase
     {
-        Product[] products = new Product[] 
-        { 
-            new Product { Id = 1, Name = "Tomato Soup", Category = "Groceries", Price = 1 }, 
-            new Product { Id = 2, Name = "Yo-yo", Category = "Toys", Price = 3.75M }, 
-            new Product { Id = 3, Name = "Hammer", Category = "Hardware", Price = 16.99M } 
+        Product[] products = new Product[]
+        {
+            new Product { Id = 1, Name = "Tomato Soup", Category = "Groceries", Price = 1 },
+            new Product { Id = 2, Name = "Yo-yo", Category = "Toys", Price = 3.75M },
+            new Product { Id = 3, Name = "Hammer", Category = "Hardware", Price = 16.99M }
         };
+
         // GET /api/XML_JSON/GetAllProducts
         /// <summary>
         /// Gets all the products
         /// </summary>
         /// <returns>A string of all products<see cref="Product"/></returns>
-        public IHttpActionResult GetAllProducts()
+        [HttpGet("/api/[controller]/GetAllProducts")]
+        public ActionResult<IEnumerable<Product>> GetAllProducts()
         {
             if (products.Length < 1)
             {
@@ -33,7 +40,8 @@ namespace AutomationTestSite.Controllers
             return Ok(products);
         }
 
-        public IHttpActionResult GetProduct(int id)
+        [HttpGet("/api/[controller]/{id}")]
+        public ActionResult<Product> GetProduct(int id)
         {
             var product = products.FirstOrDefault((p) => p.Id == id);
             if (product == null)
@@ -43,81 +51,76 @@ namespace AutomationTestSite.Controllers
             return Ok(product);
         }
 
-        public IHttpActionResult Delete(int id)
+        [HttpDelete("/api/[controller]/{id}")]
+        public IActionResult Delete(int id)
         {
-            IHttpActionResult response = null;
-
-            response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.OK));
-
             if (id > 1)
             {
-                IEnumerable<string> values;
+                IEnumerable<string> values = Request.Headers["pass"];
 
                 // Check the header for the security override first, only return a conflict if they don't have the override
-                if (!Request.Headers.TryGetValues("pass", out values) || !values.First().Equals("word"))
-                { 
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.Conflict, "Product could not be deleted"));
+                if (values != null || !values.First().Equals("word"))
+                {
+                    return this.CreateErrorResponse(StatusCodes.Status409Conflict, "Product could not be deleted");
                 }
             }
 
-            return response;
+            return Ok();
         }
 
-        public IHttpActionResult Put(int id, [FromBody]Product value)
+        [HttpPut("/api/[controller]/{id}")]
+        public IActionResult Put(int id, [FromBody] Product value)
         {
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.InternalServerError, "value is required"));
-
             if (value != null)
             {
                 if (id > 20)
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.InternalServerError,
-                                 "An error occurred attempting to update Servers"));
+                    return this.CreateErrorResponse(StatusCodes.Status500InternalServerError, "An error occurred attempting to update Servers");
                 }
                 else
                 {
-                    response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.OK));
+                    return new OkResult();
                 }
             }
             else
             {
-                response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.Conflict,
-                     string.Format("No Product found for name = {0} ", id)));
+                return this.CreateErrorResponse(StatusCodes.Status409Conflict, string.Format("No Product found for name = {0} ", id));
             }
-
-            return response;
         }
 
 
-        public IHttpActionResult Post([FromBody]Product value)
+        [HttpPost("/api/[controller]/")]
+        public IActionResult Post([FromBody] Product value)
         {
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.InternalServerError, "value is required"));
+            IActionResult response = new StatusCodeResult(StatusCodes.Status500InternalServerError);
 
             if (value != null)
             {
                 if (value.Id < 4)
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.Conflict, "Duplicate value"));
+                    // response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.Conflict, "Duplicate value"));
+                    response = new ConflictResult();
                 }
                 else
                 {
-                    response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.OK));
+                    //response = ResponseMessage(new HttpResponseMessage(HttpStatusCode.OK));
+                    return new OkResult();
                 }
             }
 
             return response;
         }
 
-        [System.Web.Http.HttpPatch]
-        public IHttpActionResult Patch(int id, [FromBody]Product value)
+        [HttpPatch("/api/[controller]/{id}")]
+        public IActionResult Patch(int id, [FromBody] Product value)
         {
-            IHttpActionResult response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.BadRequest, "Value is required"));
+            IActionResult response = new BadRequestResult();
 
             if (value != null)
             {
                 if (id > 20)
                 {
-                    response = ResponseMessage(Request.CreateErrorResponse(HttpStatusCode.NotFound, "No Product found for value"));
+                    response = new NotFoundResult();
                 }
                 else
                 {
